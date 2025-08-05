@@ -1,0 +1,23 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+      nodejs: 16
+    commands:
+      - echo "Installing dependencies..."
+
+  build:
+    commands:
+      - echo "Building backend..."
+      - cd backend && ./gradlew bootJar
+      - docker build -t backend-app .
+      - aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_REPO_URI
+      - docker tag backend-app:latest $ECR_REPO_URI:latest
+      - docker push $ECR_REPO_URI:latest
+
+      - echo "Building frontend..."
+      - cd frontend && npm install && npm run build
+      - aws s3 sync build/ s3://$S3_BUCKET --delete
+      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DIST_ID --paths "/*"
